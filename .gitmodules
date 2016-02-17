@@ -1,0 +1,15 @@
+[submodule "lib/requests"]
+	path = lib/requests
+	url = https://github.com/kennethreitz/requests.git
+[submodule "pyapi-gitlab"]
+	path = pyapi-gitlab
+	url = https://github.com/pyapi-gitlab/pyapi-gitlab.git
+[submodule "lib/gitlab"]
+	path = lib/gitlab
+	url = https://github.com/pyapi-gitlab/pyapi-gitlab.git
+[submodule "lib/org"]
+	path = lib/org
+	url = https://github.com/ppaulweber/liborg
+[submodule "lib/stdhl"]
+	path = lib/stdhl
+	url = https://github.com/ppaulweber/libstdhl

@@ -11,9 +11,222 @@ if len( sys.argv ) != 2 :
     sys.stderr.write( "%s: error: provide a GitLab access token!\n" % sys.argv[0] )
     sys.exit(-1)
 
+class gilapt(object):
+    """GitLab Python Tool"""
+    
+    def __init__( self, host, token = "" ) :    
+        self._git = gitlab.Gitlab( "https://%s" % host, token )
+
+        self._users   = None
+        self._id2user = {}
+        
+        self._groups = None
+        self._id2group = {}
+        
+        self._repos  = None
+        self._id2repo = {}
+    # end def
+    
+    ############################################################################
+    # USER
+    ############################################################################
+    
+    def getUsers( self, cache = True ) :
+        if self._users is None or cache is False :
+            self._users = []
+            c = 1
+            result = None
+            while result is None or len( result ) != 0 :
+                result = self._git.getusers( page=c )
+                c = c + 1  
+                for r in result :
+                    self._users.append( r )
+            
+            self._id2user = {}
+            for u in self._users :
+                self._id2user[ u['id'] ] = u
+            
+        return self._users
+    # end def
+    
+    def getUser( self, username_or_email, cache = True ) :
+        result = self.getUsers( cache )
+
+        users = []
+        for r in result :
+            if username_or_email in r['username'] \
+            or username_or_email in r['email'] :
+                users.append( r )
+        
+        if len( users ) == 0 :
+            return {}
+        elif len( users ) > 1 :
+            return None
+        else :
+            return users[ 0 ]
+    # end def
+    
+    def _get_user_by_id( self, user_id, cache = True ) : 
+        self.getUsers( cache )
+        
+        try :
+            return self._id2user[ user_id ]
+        except :
+            return None
+    # end def
+    
+    def hasUser( self, username_or_email, cache = True ) :
+        result = self.getUser( username_or_email, cache )
+        
+        if result is None :
+            return None
+        
+        if len( result ) == 0 :
+            return False
+        elif len( result ) != 0 :
+            return True
+    # end def
+    
+    def dumpUsers( self, search = "", cache = True, stream = sys.stdout, seperator = ", ", startOfLine = "", endOfLine = "\n" ) :
+        result = []
+        result.append( { 'id': "ID", 'username' : "User Name", 'name' : "Full Name", 'email' : "Email" } )
+        
+        for u in self.getUsers( cache ) :
+            if len( search ) == 0 \
+            or search in u['username'] \
+            or search in u['email'] :
+                result.append( u )
+        
+        for r in result :
+            stream.write( "%s%s%s%s%s%s%s%s%s" % \
+            ( startOfLine
+            , r['id'], seperator
+            , r['username'], seperator
+            , r['name'], seperator
+            , r['email'], endOfLine
+            ))
+    # end def
+
+    ############################################################################
+    # GROUP
+    ############################################################################
+    
+    def getGroups( self, cache = True ) :
+        if self._groups is None or cache is False :        
+            self._groups = []
+            c = 1
+            result = None
+            while result is None or len( result ) != 0 :
+                result = self._git.getgroups( page=c )
+                c = c + 1  
+                for r in result :
+                    self._groups.append( r )
+
+            self._id2group = {}
+            for g in self._groups :
+                self._id2group[ g['id'] ] = g
+            
+        return self._groups
+    # end def
+    
+    def getGroup( self, groupname, cache = True ) :
+        groups = self.getGroups( cache )
+        for g in groups :
+            if g[ "path" ] == groupname :
+                return g
+        return None
+    # end def
+
+    def dumpGroups( self, search = "", cache = True, stream = sys.stdout, seperator = ", ", startOfLine = "", endOfLine = "\n" ) :
+        result = []
+        result.append( { 'id': "ID", 'path' : "Group Name", 'description' : "Description" } )
+        
+        for g in self.getGroups( cache ) :
+            if len( search ) == 0 or search in g['path'] :
+                result.append( g )
+        
+        for r in result :
+            stream.write( "%s%s%s%s%s%s%s" % \
+            ( startOfLine
+            , r['id'], seperator
+            , r['path'], seperator
+            , r['description'], endOfLine
+            ))
+    # end def
+
+    ############################################################################
+    # REPOSITORIES
+    ############################################################################
+    
+    def getRepos( self, cache = True ) :
+        if self._repos is None or cache is False :
+            self._repos = []
+            c = 1
+            result = None
+            while result is None or len( result ) != 0 :
+                result = self._git.getprojectsall( page=c )
+                c = c + 1
+                for project in result :
+                    self._repos.append( project )
+
+            for r in self._repos :
+                self._id2repo[ r['id'] ] = r
+            
+        return self._repos
+    # end def
+
+    def getRepo( self, name, cache = True ) :
+        pass
+    # end def
+    
+    def dumpRepos( self, search = "", cache = True, stream = sys.stdout, seperator = ", ", startOfLine = "", endOfLine = "\n" ) :
+        repos = self.getRepos( cache )
+        
+        result = []
+        if len( search ) == 0 :
+            result = repos
+        else :
+            for r in repos :
+                if search in r[ "path_with_namespace" ] :
+                    result.append( r )
+
+        result = []
+        result.append
+        ( { 'id': "ID"
+          , 'path_with_namespace' : "Repository Path"
+          , 'description' : "Description"
+          , 'public' : "Public"
+          , 'namespace' : { 'owner_id' : None }
+          }
+        )
+        
+        for r in self.getRepos( cache ) :
+            if len( search ) == 0 or search in r['path_with_namespace'] :
+                result.append( r )
+        
+        for r in result :
+            if r['namespace']['owner_id'] is None :
+                owner = "Owner"
+            else :
+                owner = self._get_user_by_id( r['namespace']['owner_id'] )[ 'username' ]
+            
+            stream.write( "%s%s%s%s%s%s%s%s%s%s%s" % \
+            ( startOfLine, r['id']
+            , seperator,   r['path_with_namespace']
+            , seperator,   r['description']
+            , seperator,   r['public']
+            , seperator,   owner
+            , endOfLine
+            ))
+    # end def
+
+    
+# end class
+
+
 git = gitlab.Gitlab( "https://gitlab.swa.univie.ac.at", token=sys.argv[1] )
 org = libOrg.libOrg( "test.org" )
-
+        
 # generic function can be moved to 'liborg' repository!
 def findTable( org ) :
     if isinstance( org, libOrg.libOrg ) :

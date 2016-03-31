@@ -7,16 +7,18 @@ sys.path.append( "./lib/org/py" )
 import gitlab
 import libOrg
 
-if len( sys.argv ) != 2 :
+if len( sys.argv ) != 4 :
     sys.stderr.write( "%s: error: provide a GitLab access token!\n" % sys.argv[0] )
     sys.exit(-1)
 
+
+    
 class gilapt(object):
     """GitLab Python Tool"""
     
     def __init__( self, host, token = "" ) :    
-        self._git = gitlab.Gitlab( "https://%s" % host, token )
-
+        self._git = gitlab.Gitlab( "https://%s" % host, token = token, verify_ssl = False )
+        
         self._users   = None
         self._id2user = {}
         
@@ -26,6 +28,13 @@ class gilapt(object):
         self._repos  = None
         self._id2repo = {}
     # end def
+    
+    def sync( self ) :
+        self.getUsers( False )
+        self.getGroups( False )
+        self.getRepos( False )
+    # end def
+
     
     ############################################################################
     # USER
@@ -58,9 +67,7 @@ class gilapt(object):
             or username_or_email in r['email'] :
                 users.append( r )
         
-        if len( users ) == 0 :
-            return {}
-        elif len( users ) > 1 :
+        if len( users ) == 0 or len( users ) > 1 :
             return None
         else :
             return users[ 0 ]
@@ -79,12 +86,61 @@ class gilapt(object):
         result = self.getUser( username_or_email, cache )
         
         if result is None :
-            return None
-        
-        if len( result ) == 0 :
             return False
-        elif len( result ) != 0 :
+        else :
             return True
+    # end def
+
+    def addUser \
+    ( self
+    , fullname, username, password, email
+    , projects_limit = None
+    , can_create_group = None
+    , confirm = None
+    , admin = None
+    , skype = None
+    , linkedin = None
+    , twitter = None
+    , url = None
+    , bio = None
+    , ext = None
+    , eid = None
+    , epr = None
+    ) :        
+        params = {}
+        if projects_limit is not None :
+            params['projects_limit'] = projects_limit # Number of projects user can create
+        else :
+            params['projects_limit'] = 0
+        
+        if can_create_group is not None :
+            params['can_create_group'] = can_create_group # User can create groups - true or false
+        else :
+            params['can_create_group'] = "false"
+        
+        if confirm is not None :
+            params['confirm'] = confirm # Require confirmation - true (default) or false
+        if admin is not None :
+            params['admin'] = admin # User is admin - true or false (default)
+        if skype is not None :
+            params['skype'] = skype # Skype Account
+        if linkedin is not None :
+            params['linkedin'] = linkedin # LinkedIn Account
+        if twitter is not None :
+            params['twitter'] = twitter # Twitter Account
+        if url is not None :
+            params['website_url'] = url # Website URL
+        if bio is not None :
+            params['bio'] = bio # User's biography
+        if ext is not None :
+            params['external'] = ext # Flags the user as external - true or false(default)
+        if eid is not None :
+            params['extern_uid'] = eid # External UID
+        if epr is not None :
+            params['provider'] = epr # External Provider Name
+        
+        result = self._git.createuser( fullname, username, password, email, **params )
+        return result
     # end def
     
     def dumpUsers( self, search = "", cache = True, stream = sys.stdout, seperator = ", ", startOfLine = "", endOfLine = "\n" ) :
@@ -107,6 +163,7 @@ class gilapt(object):
             ))
     # end def
 
+    
     ############################################################################
     # GROUP
     ############################################################################
@@ -137,6 +194,24 @@ class gilapt(object):
         return None
     # end def
 
+    def _get_group_by_id( self, group_id, cache = True ) : 
+        self.getGroups( cache )
+        
+        try :
+            return self._id2group[ group_id ]
+        except :
+            return None
+    # end def
+    
+    def hasGroup( self, groupname, cache = True ) :
+        result = self.getGroup( groupname, cache )
+        
+        if result is None :
+            return False
+        else :
+            return True
+    # end def
+    
     def dumpGroups( self, search = "", cache = True, stream = sys.stdout, seperator = ", ", startOfLine = "", endOfLine = "\n" ) :
         result = []
         result.append( { 'id': "ID", 'path' : "Group Name", 'description' : "Description" } )
@@ -153,7 +228,8 @@ class gilapt(object):
             , r['description'], endOfLine
             ))
     # end def
-
+    
+    
     ############################################################################
     # REPOSITORIES
     ############################################################################
@@ -177,6 +253,32 @@ class gilapt(object):
 
     def getRepo( self, name, cache = True ) :
         pass
+    # end def
+    
+    def getRepo( self, repopath, cache = True ) :
+        repos = self.getRepos( cache )
+        for r in repos :
+            if r[ "path_with_namespace" ] == repopath :
+                return r
+        return None
+    # end def
+
+    def _get_repo_by_id( self, repo_id, cache = True ) : 
+        self.getRepos( cache )
+        
+        try :
+            return self._id2repo[ repo_id ]
+        except :
+            return None
+    # end def
+    
+    def hasRepo( self, repopath, cache = True ) :
+        result = self.getRepo( repopath, cache )
+        
+        if result is None :
+            return False
+        else :
+            return True
     # end def
     
     def dumpRepos( self, search = "", cache = True, stream = sys.stdout, seperator = ", ", startOfLine = "", endOfLine = "\n" ) :
@@ -223,67 +325,30 @@ class gilapt(object):
     
 # end class
 
+git = gilapt( sys.argv[1], sys.argv[2] )
 
-git = gitlab.Gitlab( "https://gitlab.swa.univie.ac.at", token=sys.argv[1] )
-org = libOrg.libOrg( "test.org" )
-        
-# generic function can be moved to 'liborg' repository!
-def findTable( org ) :
-    if isinstance( org, libOrg.libOrg ) :
-        return findTable( org._content )
-    elif isinstance( org, libOrg.OrgModeContent ) :
-        for c in org._content :
-            if isinstance( c, libOrg.Table ) :
-                return c
-    else :
-        assert "invalid 'org' object to analyze"
-    return None
-# end def
+org = libOrg.libOrg( sys.argv[3] )
 
-# generic function can be moved to 'liborg' repository!
-def iterateTable( org, row_action = lambda y, row : True, cell_action = lambda x, y, cell : None ) :
-    def print_row( y, row ) :
-        print y, row
-        return True
-    # end def
-    def print_cell( x, y, row ) :
-        print x, y, row        
-    # end def
-    if row_action is None :
-        row_action = print_row
-    if cell_action is None :
-        cell_action = print_cell
-    
-    assert isinstance( org, libOrg.Table )    
-    y = 0
-    for row in org._content :
-        assert isinstance( row, libOrg.TableRow )
-        # print row
-        result = row_action( y, row )
-        if result == True or result is None :
-            x = 0
-            for cell in row._content :
-                assert isinstance( cell, libOrg.TableCell )
-                # print cell
-                cell_action( x, y, cell )
-                x = x + 1
-        y = y + 1
-# end def
-
-table = findTable( org )
+table = org.findFirstTable()
 
 if table is None :
+    sys.stderr.write( "%s: error: no org table found!\n" % sys.argv[0] )    
     sys.exit(-1)
 
 def process_row( y, row ) :
     if row.columns[0] is None :
         return False
 
-    print row, row.columns[0], row.columns[0] is None
-    # return True
+    #print row
+    print row.columns[0]
 # end def
 
-iterateTable( table, process_row )
+org.iterateTable( table, None )
+print "###########"
+
+org.iterateTable( table, process_row )
+
+
 
 
 def findGroup( path ) :

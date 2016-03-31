@@ -280,6 +280,11 @@ class gilapt(object):
         else :
             return True
     # end def
+
+    def addRepo( self ) :
+        # git._git.createproject( "testproject2", namespace_id = 2, description = "lala project", snippets_enabled = "false", public = 0, merge_requests_enabled = "false" )
+        pass
+    # end def
     
     def dumpRepos( self, search = "", cache = True, stream = sys.stdout, seperator = ", ", startOfLine = "", endOfLine = "\n" ) :
         repos = self.getRepos( cache )
@@ -321,9 +326,60 @@ class gilapt(object):
             , endOfLine
             ))
     # end def
+    
+    
+    ############################################################################
+    # BRANCHES
+    ############################################################################
 
+    def modBranch( self, repo, branch, protected ) :
+        
+        # git.protectbranch( repo_id, master_id )
+        # git.unprotectbranch( repo_id, branch_id )
+        
+        pass 
+    # end def
+
+    def getBranch( self, repo, branch ) :
+        
+        # git.getbranch( repo_id, branch_id )
+        # return False
+        # return {} of branch info
+        
+        pass
+    # end def
+
+    def addBranch( self, repo, branch ) :
+        
+        # git.createbranch( repo_id, new_branch_id, fork_branch_id )
+        
+        pass
+    # end def
+    
+    
+    ############################################################################
+    # FILES
+    ############################################################################
+    
+    def addFile( self, repo, filepath, branch, data, commit_message, encoding = "text" ) :
+        # encoding 'text' or 'base64'
+        
+        # git._git.createfile( 3, "README.md", "master", encoding, "# Hello Test Project", "Initial Commit" )
+        # returns really True and False
+        
+        pass
+    # end def
+    
+    def modFile( self, repo, filepath, branch, data, commit_message ) :
+        # can also be used to create files with no care if it already exists or not :)
+        
+        # updatefile(self, project_id, file_path, branch_name, content, commit_message):
+        pass
+    # end def
+    
     
 # end class
+
 
 git = gilapt( sys.argv[1], sys.argv[2] )
 

@@ -59,6 +59,9 @@ class gilapt(object):
         self._groups = None
         self._id2group = {}
         
+        self._namespaces = None
+        self._id2namespace = {}
+        
         self._repos  = None
         self._id2repo = {}
     # end def
@@ -66,9 +69,10 @@ class gilapt(object):
     def sync( self ) :
         self.getUsers( False )
         self.getGroups( False )
+        self.getNamespaces( False )
         self.getRepos( False )
     # end def
-
+    
     
     ############################################################################
     # USER
@@ -263,6 +267,44 @@ class gilapt(object):
             ))
     # end def
     
+    ############################################################################
+    # NAMESPACES
+    ############################################################################
+    
+    def getNamespaces( self, cache = True ) :
+        if self._namespaces is None or cache is False :
+            self._namespaces = []
+            c = 1
+            result = None
+            while result is None or len( result ) != 0 :
+                result = self._git.getnamespaces( page=c )
+                c = c + 1
+                for ns in result :
+                    self._namespaces.append( ns )
+            
+            for ns in self._namespaces :
+                self._id2namespace[ ns['id'] ] = ns
+            
+        return self._namespaces
+    # end def
+
+    def getNamespace( self, namespace, cache = True ) :
+        result = self.getNamespaces( cache )
+        for r in result :
+            if r[ "path" ] == namespace :
+                return r
+        return None
+    # end def
+    
+    def hasNamespace( self, namespace, cache = True ) :
+        result = self.getNamespace( namespace, cache )
+
+        if result is None :
+            return False
+        else :
+            return True
+    # end def
+    
     
     ############################################################################
     # REPOSITORIES
@@ -284,10 +326,6 @@ class gilapt(object):
             
         return self._repos
     # end def
-
-    def getRepo( self, name, cache = True ) :
-        pass
-    # end def
     
     def getRepo( self, repopath, cache = True ) :
         repos = self.getRepos( cache )
@@ -296,7 +334,13 @@ class gilapt(object):
                 return r
         return None
     # end def
-
+    
+    def getRepoID( self, repopath, cache = True ) :
+        result = self.getRepo( repopath, cache )
+        assert result is not None, "repo does not exist!"
+        return result['id']
+    # end def
+    
     def _get_repo_by_id( self, repo_id, cache = True ) : 
         self.getRepos( cache )
         
@@ -315,9 +359,53 @@ class gilapt(object):
             return True
     # end def
 
-    def addRepo( self ) :
-        # git._git.createproject( "testproject2", namespace_id = 2, description = "lala project", snippets_enabled = "false", public = 0, merge_requests_enabled = "false" )
-        pass
+    def addRepo \
+    ( self
+    , name
+    , namespace
+    , description
+    , public = False
+    , issues = True
+    , snippets = True
+    , merge = True
+    , wiki = True
+    , builds = True
+    ) :
+        params = {}        
+        params['namespace_id'] = self.getNamespace( namespace )['id']
+        params['description']  = description
+        
+        if public :
+            params['public'] = "true"
+        else :
+            params['public'] = "false"
+
+        if issues :
+            params['issues_enabled'] = "true"
+        else :
+            params['issues_enabled'] = "false"
+            
+        if snippets :
+            params['snippets_enabled'] = "true"
+        else :
+            params['snippets_enabled'] = "false"
+
+        if merge :
+            params['merge_requests_enabled'] = "true"
+        else :
+            params['merge_requests_enabled'] = "false"
+
+        if wiki :
+            params['wiki_enabled'] = "true"
+        else :
+            params['wiki_enabled'] = "false"
+
+        if builds :
+            params['builds_enabled'] = "true"
+        else :
+            params['builds_enabled'] = "false"
+        
+        self._git.createproject( name, **params )
     # end def
     
     def dumpRepos( self, search = "", cache = True, stream = sys.stdout, seperator = ", ", startOfLine = "", endOfLine = "\n" ) :
@@ -366,45 +454,89 @@ class gilapt(object):
     # BRANCHES
     ############################################################################
 
-    def modBranch( self, repo, branch, protected ) :
-        
-        # git.protectbranch( repo_id, master_id )
-        # git.unprotectbranch( repo_id, branch_id )
-        
-        pass 
-    # end def
+    def modBranch( self, repopath, branch, protect, cache = True ) :
+        if not self.hasBranch( repopath, branch, cache ) :
+            assert False, "repo branch does not exist!"
 
-    def getBranch( self, repo, branch ) :
+        uid = self.getRepoID( repopath, cache )
         
-        # git.getbranch( repo_id, branch_id )
-        # return False
-        # return {} of branch info
-        
-        pass
+        if protect :
+            git.protectbranch( uid, branch )
+        else :
+            git.unprotectbranch( uid, branch )
     # end def
-
-    def addBranch( self, repo, branch ) :
+    
+    def getBranch( self, repopath, branch, cache = True ) :
+        uid = self.getRepoID( repopath, cache )
+    
+        result = git.getbranch( uid, branch )
+        if isinstance( result, dict ) :
+            return result
+        else :
+            return None
+    # end def
+    
+    def hasBranch( self, repopath, branch, cache = True ) :
+        result = self.getBranch( repopath, branch, cache )
         
-        # git.createbranch( repo_id, new_branch_id, fork_branch_id )
+        if result is None :
+            return False
+        else :
+            return True
+    # end def
+    
+    def addBranch( self, repopath, new_branch, old_branch, cache = True ) :
+        if self.hasBranch( repopath, new_branch, cache ) :
+            assert False, "repo 'new_branch' already exists!"
+        if not self.hasBranch( repopath, old_branch, cache ) :
+            assert False, "repo 'old_branch' does not exist!"
         
-        pass
+        uid = self.getRepoID( repopath, cache )
+        
+        git.createbranch( uid, new_branch, old_branch )
     # end def
     
     
     ############################################################################
     # FILES
     ############################################################################
-    
-    def addFile( self, repo, filepath, branch, data, commit_message, encoding = "text" ) :
-        # encoding 'text' or 'base64'
+
+    def getFile( self, repopath, branch, filepath, cache = True ) :
+        uid = self.getRepoID( repopath, cache )
+        if not self.hasBranch( repopath, branch, cache ) :
+            assert False, "repo branch does not exist!"
+
+        result = git._git.getfile( uid, filepath, "master2" )
+        if isinstance( result, dict ) :
+            return result
+        else :
+            return None
+    # end def
+
+    def hasFile( self, repopath, branch, filepath, cache = True ) :
+        result = self.getFile( repopath, branch, filepath, cache )
         
-        # git._git.createfile( 3, "README.md", "master", encoding, "# Hello Test Project", "Initial Commit" )
-        # returns really True and False
-        
-        pass
+        if result is None :
+            return False
+        else :
+            return True
     # end def
     
-    def modFile( self, repo, filepath, branch, data, commit_message ) :
+    def addFile( self, repopath, branch, filepath, data, commit_message, encoding = "text", cache = True ) :
+        uid = self.getRepoID( repopath, cache )
+        if not self.hasBranch( repopath, branch, cache ) :
+            assert False, "repo branch does not exist!"
+        if self.hasFile( repopath, branch, filepath, cache ) :
+            assert False, "file already exists!"
+        
+        if not ( encoding in [ "text", "base64" ] ) :
+            assert False, "invalid encoding"
+
+        result = git._git.createfile( uid, filepath, branch, encoding, data, commit_message )
+        assert result == True, "internal error!"
+    # end def
+    
+    def modFile( self, repo, branch, filepath, data, commit_message ) :
         # can also be used to create files with no care if it already exists or not :)
         
         # updatefile(self, project_id, file_path, branch_name, content, commit_message):

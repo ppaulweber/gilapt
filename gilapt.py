@@ -469,7 +469,7 @@ class gilapt(object):
     def getBranch( self, repopath, branch, cache = True ) :
         uid = self.getRepoID( repopath, cache )
     
-        result = git.getbranch( uid, branch )
+        result = self._git.getbranch( uid, branch )
         if isinstance( result, dict ) :
             return result
         else :
@@ -546,133 +546,8 @@ class gilapt(object):
     
 # end class
 
-
-git = gilapt( sys.argv[1], sys.argv[2] )
-
-org = libOrg.libOrg( sys.argv[3] )
-
-table = org.findFirstTable()
-
-if table is None :
-    sys.stderr.write( "%s: error: no org table found!\n" % sys.argv[0] )    
-    sys.exit(-1)
-
-def process_row( y, row ) :
-    if row.columns[0] is None :
-        return False
-
-    #print row
-    print row.columns[0]
-# end def
-
-org.iterateTable( table, None )
-print "###########"
-
-org.iterateTable( table, process_row )
-
-
-
-
-def findGroup( path ) :
-    c = 1
-    result = None
-    while result is None or len( result ) != 0 :
-        result = git.getgroups( page=c )
-        c = c + 1
-        for group in result :
-            if group["path"] == path :
-                return group
-    return None
-# end def
-
-def findProjects( group ) :
-    projects = []
-    c = 1
-    result = None
-    while result is None or len( result ) != 0 :
-        result = git.getprojects( page=c )
-        c = c + 1
-        for project in result :
-            if project["namespace"]["id"] == group["id"] :
-                projects.append( project )
-    return projects
-# end def
-
-def findProject( projects, name ) :
-    for p in projects :
-        if name == p["path"] :
-            return p
-    return None
-# end def
-
-
-
-
-
-
-
-# git.createproject( "test_repo_via_api", namespace_id = 32, description = "Test Repo Via API" )
-# git.createfile( 61, "README.org", "master", "* Hello Test Repo\n\n\nThis is a README text.", "README\n\n* added README file" )
-# git.updatefile( 61, "README.org", "master", "* Hello Test Repo\n\n\nThis is a README text, which is created via API.", "README\n\n* updated README file" )
-
-# git.updatefile( 62, "README.md", "2016ss_swa_task0", "# Hello Test Repo=\n\n\nThis is a README text.\n", "README\n\n* update README file" )
-
-def doit( name ) :
-    group_id = "submission"
-    
-    group = findGroup( group_id )
-    assert group is not None, "invalid group"
-
-    namespace_id = group["id"]
-    
-    projects = findProjects( group )
-    repo = findProject( projects, name )
-    
-    if repo is None :        
-        print( "%s/%s: creating repository" % ( group_id, name ) )
-        repo = git.createproject \
-        ( name
-        , namespace_id = namespace_id
-        , description = "TODO Description"
-        )
-        assert isinstance( repo, dict ), "gitlab error"
-    
-    master_id = u"master"
-    repo_id   = repo["id"]
-    repo_path = repo["path_with_namespace"]
-
-    print( "%s: found repository" % ( repo_path ) )
-    
-    if repo["default_branch"] is None :
-        git.createfile \
-        ( repo_id
-        , "README.md"
-        , "master"
-        , "# Hello Test Repo\n\n\nThis is a README text. TODO :smiley:"
-        , "Initial Commit\n"
-        + "\n"
-        + "* added README file"
-        )
-    
-    print( "%s @ %s: set to protected" % ( repo_path, master_id ) )
-    print git.protectbranch( repo_id, master_id )
-    
-    
-    for i in range(1,5) :
-        branch_id = u"2017ss_swa_task%s" % i
-        
-        branch = git.getbranch( repo_id, branch_id )
-        
-        if not isinstance( branch, dict ) :
-            print( "%s @ %s: creating branch of '%s'" % ( repo_path, branch_id, master_id ) )
-            branch = git.createbranch( repo_id, branch_id, master_id )
-            assert isinstance( branch, dict ), "gitlab error"
-        
-        print( "%s @ %s: found branch" % ( repo_path, branch_id ) )
-        
-        print( "%s @ %s: set to unprotected" % ( repo_path, branch_id ) )
-        print git.unprotectbranch( repo_id, branch_id )
-# end def
-
+# git = gilapt( sys.argv[1], sys.argv[2] )
+# org = libOrg.libOrg( sys.argv[3] )
+# table = org.findFirstTable()
 
 import pdb; pdb.set_trace()

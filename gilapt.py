@@ -32,11 +32,12 @@
 #   WITH THE SOFTWARE.
 #   
 
+import os
 import sys
 
-sys.path.append( "./lib/requests" )
-sys.path.append( "./lib/gitlab" )
-sys.path.append( "./lib/org/py" )
+sys.path.append( os.path.join( os.path.dirname( __file__ ), "lib", "requests" ) )
+sys.path.append( os.path.join( os.path.dirname( __file__ ), "lib", "gitlab" ) )
+sys.path.append( os.path.join( os.path.dirname( __file__ ), "lib", "org", "py" ) )
 
 import gitlab
 import libOrg
@@ -50,8 +51,8 @@ if len( sys.argv ) != 4 :
 class gilapt(object):
     """GitLab Python Tool"""
     
-    def __init__( self, host, token = "" ) :    
-        self._git = gitlab.Gitlab( "https://%s" % host, token = token, verify_ssl = False )
+    def __init__( self, host, token = "", verify_ssl = True ) :
+        self._git = gitlab.Gitlab( "https://%s" % host, token = token, verify_ssl = verify_ssl )
         
         self._users   = None
         self._id2user = {}
@@ -550,4 +551,4 @@ class gilapt(object):
 # org = libOrg.libOrg( sys.argv[3] )
 # table = org.findFirstTable()
 
-import pdb; pdb.set_trace()
+# import pdb; pdb.set_trace()

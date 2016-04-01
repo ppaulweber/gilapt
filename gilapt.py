@@ -111,6 +111,12 @@ class gilapt(object):
         else :
             return users[ 0 ]
     # end def
+        
+    def getUserID( self, username_or_email, cache = True ) :
+        result = self.getUser( username_or_email, cache )
+        assert result is not None, "user does not exist!"
+        return result['id']
+    # end def
     
     def _get_user_by_id( self, user_id, cache = True ) : 
         self.getUsers( cache )
@@ -181,18 +187,36 @@ class gilapt(object):
         result = self._git.createuser( fullname, username, password, email, **params )
         return result
     # end def
+
+    def modUser( self, username_or_email, username = None, fullname = None, ext = None ) :
+        uid = self.getUserID( username_or_email )
+        
+        params = {}
+        if username is not None :
+            params['username'] = username
+        if fullname is not None :
+            params['name'] = fullname
+        if ext is not None :
+            if ext is True :
+                params['external'] = "true"
+            elif ext is False :
+                params['external'] = "false"
+        
+        self._git.edituser( uid, **params )
+    # end def
     
     def dumpUsers( self, search = "", cache = True, stream = sys.stdout, seperator = ", ", startOfLine = "", endOfLine = "\n" ) :
         result = []
-        result.append( { 'id': "ID", 'username' : "User Name", 'name' : "Full Name", 'email' : "Email" } )
         
         for u in self.getUsers( cache ) :
             if len( search ) == 0 \
             or search in u['username'] \
             or search in u['email'] :
                 result.append( u )
+
+        result.append( { 'id': "ID", 'username' : "User Name", 'name' : "Full Name", 'email' : "Email" } )
         
-        for r in result :
+        for r in result[::-1] :
             stream.write( "%s%s%s%s%s%s%s%s%s" % \
             ( startOfLine
             , r['id'], seperator
@@ -304,6 +328,23 @@ class gilapt(object):
             return False
         else :
             return True
+    # end def
+
+    def dumpNamespaces( self, search = "", cache = True, stream = sys.stdout, seperator = ", ", startOfLine = "", endOfLine = "\n" ) :
+        result = []
+        result.append( { 'id': "ID", 'path' : "Namespace", 'kind' : "Kind" } )
+        
+        for g in self.getNamespaces( cache ) :
+            if len( search ) == 0 or search in g['path'] :
+                result.append( g )
+        
+        for r in result :
+            stream.write( "%s%s%s%s%s%s%s" % \
+            ( startOfLine
+            , r['id'], seperator
+            , r['kind'], seperator
+            , r['path'], endOfLine
+            ))
     # end def
     
     

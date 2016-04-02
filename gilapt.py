@@ -65,7 +65,9 @@ class gilapt(object):
         
         self._repos  = None
         self._id2repo = {}
-    # end def
+
+        self._members = None
+# end def
     
     def sync( self ) :
         self.getUsers( False )
@@ -185,9 +187,15 @@ class gilapt(object):
             params['provider'] = epr # External Provider Name
         
         result = self._git.createuser( fullname, username, password, email, **params )
+
+        if isinstance( result, dict ) :
+            print "gilapt: internal: user added", result['id'], result['name']
+            self._users.append( result )
+            self._id2user[ result['id'] ] = result
+        
         return result
     # end def
-
+    
     def modUser( self, username_or_email, username = None, fullname = None, ext = None ) :
         uid = self.getUserID( username_or_email )
         
@@ -447,7 +455,14 @@ class gilapt(object):
         else :
             params['builds_enabled'] = "false"
         
-        self._git.createproject( name, **params )
+        result = self._git.createproject( name, **params )
+        
+        if isinstance( result, dict ) :
+            print "gilapt: internal: repo added", result['id'], result['path_with_namespace']
+            self._repos.append( result )
+            self._id2repo[ result['id'] ] = result
+        
+        return result
     # end def
     
     def dumpRepos( self, search = "", cache = True, stream = sys.stdout, seperator = ", ", startOfLine = "", endOfLine = "\n" ) :
@@ -496,18 +511,6 @@ class gilapt(object):
     # BRANCHES
     ############################################################################
 
-    def modBranch( self, repopath, branch, protect, cache = True ) :
-        if not self.hasBranch( repopath, branch, cache ) :
-            assert False, "repo branch does not exist!"
-
-        uid = self.getRepoID( repopath, cache )
-        
-        if protect :
-            git.protectbranch( uid, branch )
-        else :
-            git.unprotectbranch( uid, branch )
-    # end def
-    
     def getBranch( self, repopath, branch, cache = True ) :
         uid = self.getRepoID( repopath, cache )
     
@@ -535,20 +538,100 @@ class gilapt(object):
         
         uid = self.getRepoID( repopath, cache )
         
-        git.createbranch( uid, new_branch, old_branch )
+        self._git.createbranch( uid, new_branch, old_branch )
     # end def
     
+    def modBranch( self, repopath, branch, protect, cache = True ) :
+        if not self.hasBranch( repopath, branch, cache ) :
+            assert False, "repo branch does not exist!"
+
+        uid = self.getRepoID( repopath, cache )
+        
+        if protect :
+            self._git.protectbranch( uid, branch )
+        else :
+            self._git.unprotectbranch( uid, branch )
+    # end def
+
+    
+    ############################################################################
+    # MEMBERS
+    ############################################################################
+    
+    def getMembers( self, repopath, cache = True ) :
+        uid = self.getRepoID( repopath, cache )
+
+        if self._members is None :
+            self._members = {}
+        if not ( uid in self._members ) :
+            self._members[ uid ] = []
+        if len( self._members[ uid ] ) == 0 or cache is False :
+            self._members[ uid ] = []
+            c = 0
+            while True :
+                c = c + 1
+                result = self._git.getprojectmembers( uid, page = c, per_page = 100 )                
+                self._members[ uid ].extend( result )
+                if len( result ) < 100 :
+                    break
+        return self._members[ uid ]
+    # end def
+    
+    def hasMember( self, repopath, username_or_email, cache = True ) :
+        result = self.getMembers( repopath, cache )
+        uid = self.getUserID( username_or_email, cache )
+        
+        for r in result :
+            if r['id'] == uid :
+                return True
+        return False
+    # end def
+    
+    def addMember( self, repopath, username_or_email, access_level = None, cache = True ) :        
+        if not self.hasRepo( repopath, cache ) :
+            assert False, "repo does not exist!"        
+        if not self.hasUser( username_or_email, cache ) :
+            assert False, "user does not exist!"        
+        if self.hasMember( repopath, username_or_email, cache ) :
+            assert False, "repo 'member' already exists!"
+        allowed_rights = [ "guest", "reporter", "developer", "master" ]
+        if not ( access_level in allowed_rights ) :
+            assert False, "invalid argument for 'access_level' parameter!"
+        
+        rid = self.getRepoID( repopath, cache )
+        uid = self.getUserID( username_or_email, cache )
+        
+        return self._git.addprojectmember( rid, uid, access_level )
+    # end def
+    
+    def modMember( self, repopath, branch, protect, cache = True ) :
+        # if not self.hasBranch( repopath, branch, cache ) :
+        #     assert False, "repo branch does not exist!"
+
+        # uid = self.getRepoID( repopath, cache )
+        
+        # if protect :
+        #     git.protectbranch( uid, branch )
+        # else :
+        #     git.unprotectbranch( uid, branch )
+        pass
+    # end def
+
+        
     
     ############################################################################
     # FILES
     ############################################################################
 
     def getFile( self, repopath, branch, filepath, cache = True ) :
-        uid = self.getRepoID( repopath, cache )
-        if not self.hasBranch( repopath, branch, cache ) :
-            assert False, "repo branch does not exist!"
-
-        result = git._git.getfile( uid, filepath, "master2" )
+        repo = self.getRepo( repopath, cache )
+        uid = repo['id']
+        
+        if repo['default_branch'] is not None :
+            if not self.hasBranch( repopath, branch, cache ) :
+                assert False, "repo branch does not exist!"
+        
+        result = self._git.getfile( uid, filepath, branch )
         if isinstance( result, dict ) :
             return result
         else :
@@ -565,24 +648,35 @@ class gilapt(object):
     # end def
     
     def addFile( self, repopath, branch, filepath, data, commit_message, encoding = "text", cache = True ) :
-        uid = self.getRepoID( repopath, cache )
-        if not self.hasBranch( repopath, branch, cache ) :
-            assert False, "repo branch does not exist!"
+        repo = self.getRepo( repopath, cache )
+        uid = repo['id']
+
+        if repo['default_branch'] is not None :
+            if not self.hasBranch( repopath, branch, cache ) :
+                assert False, "repo branch does not exist!"
         if self.hasFile( repopath, branch, filepath, cache ) :
             assert False, "file already exists!"
         
         if not ( encoding in [ "text", "base64" ] ) :
             assert False, "invalid encoding"
 
-        result = git._git.createfile( uid, filepath, branch, encoding, data, commit_message )
+        result = self._git.createfile( uid, filepath, branch, encoding, data, commit_message )
         assert result == True, "internal error!"
+        return result
     # end def
     
-    def modFile( self, repo, branch, filepath, data, commit_message ) :
-        # can also be used to create files with no care if it already exists or not :)
+    def modFile( self, repopath, branch, filepath, data, commit_message, cache = True ) :
+        # can also be used to create files with no care if it already exists or not :)        
+        repo = self.getRepo( repopath, cache )
+        uid = repo['id']
+
+        if repo['default_branch'] is not None :
+            if not self.hasBranch( repopath, branch, cache ) :
+                assert False, "repo branch does not exist!"
         
-        # updatefile(self, project_id, file_path, branch_name, content, commit_message):
-        pass
+        result = self._git.updatefile( uid, filepath, branch, data, commit_message )
+        assert result == True, "internal error!"
+        return result
     # end def
     
     

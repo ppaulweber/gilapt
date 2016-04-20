@@ -604,6 +604,22 @@ class gilapt(object):
         
     
     ############################################################################
+    # MILESTONES
+    ############################################################################
+
+    ## TODO: FIXME: PPA: this needs more attention!!!
+    def addMilestone( self, repopath, title, description, deadline, cache = True ) :
+        repo = self.getRepo( repopath, cache )
+        uid = repo['id']
+        
+        result = self._git.createmilestone( uid, title, description = description, due_date = deadline )
+        #print result
+        #if result != True :
+        #sys.stderr.write( "gilapt: error: unable to add file '%s' at repo '%s' @ '%s'\n" % ( filepath, repopath, branch ) )
+        return result
+    # end def
+    
+    ############################################################################
     # FILES
     ############################################################################
 
@@ -643,9 +659,10 @@ class gilapt(object):
         
         if not ( encoding in [ "text", "base64" ] ) :
             assert False, "invalid encoding"
-
+        
         result = self._git.createfile( uid, filepath, branch, encoding, data, commit_message )
-        assert result == True, "internal error!"
+        if result != True :
+            sys.stderr.write( "gilapt: error: unable to add file '%s' at repo '%s' @ '%s'\n" % ( filepath, repopath, branch ) )
         return result
     # end def
     

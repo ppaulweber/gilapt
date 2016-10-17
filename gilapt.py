@@ -249,6 +249,12 @@ class gilapt(object):
         return None
     # end def
 
+    def getGroupID( self, groupname, cache = True ) :
+        result = self.getGroup( groupname, cache )
+        assert result is not None, "group does not exist!"
+        return result['id']
+    # end def
+
     def _get_group_by_id( self, group_id, cache = True ) : 
         self.getGroups( cache )
         
@@ -588,6 +594,29 @@ class gilapt(object):
         return self._git.addprojectmember( rid, uid, access_level )
     # end def
     
+    def addGroup( self, repopath, groupname, access_level = None, cache = True ) :        
+        if not self.hasRepo( repopath, cache ) :
+            assert False, "repo does not exist!"        
+        if not self.hasGroup( groupname, cache ) :
+            assert False, "group does not exist!"        
+        
+        allowed_rights = \
+        { "guest" : 10
+        , "reporter" : 20
+        , "developer" : 30
+        , "master" : 40
+        }
+        
+        if not ( access_level in allowed_rights.keys() ) :
+            assert False, "invalid argument for 'access_level' parameter!"
+        
+        rid = self.getRepoID( repopath, cache )
+        gid = self.getGroupID( groupname, cache )
+
+        
+        return self._git.shareproject( rid, gid, allowed_rights[ access_level ] )
+    # end def
+
     def modMember( self, repopath, branch, protect, cache = True ) :
         # if not self.hasBranch( repopath, branch, cache ) :
         #     assert False, "repo branch does not exist!"

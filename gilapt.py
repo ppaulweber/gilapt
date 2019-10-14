@@ -356,7 +356,7 @@ class gilapt(object):
             c = 1
             result = None
             while result is None or len( result ) != 0 :
-                result = self._git.getprojectsall( page=c )
+                result = self._git.getprojects( page=c )
                 c = c + 1
                 for project in result :
                     self._repos.append( project )
